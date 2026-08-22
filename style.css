@@ -160,13 +160,27 @@ select:focus { border-color: var(--accent); }
 .result-label { color: var(--accent); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
 .result-header h4 { margin: 5px 0 0; font: 600 18px "Space Grotesk"; }
 .word-badge { background: #f2f3f7; border-radius: 999px; padding: 6px 9px; color: var(--muted); font-size: 10px; }
-.summary-content {
-  margin-top: 18px; padding: 17px; border-radius: 14px; background: var(--surface-soft);
-  color: #3a4355; font-size: 13px; line-height: 1.75; white-space: pre-wrap;
+.summary-heading {
+  margin-top: 18px;
+  color: #858da0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
 }
-.summary-content p { margin: 0 0 10px; }
+.summary-content {
+  margin-top: 8px;
+  padding: 19px 20px;
+  border: 1px solid #e8eaf2;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #fafaff, #f7f8fc);
+  color: #30394b;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.summary-content p { margin: 0 0 13px; }
 .summary-content p:last-child { margin-bottom: 0; }
-.result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
 .result-card { border: 1px solid var(--line); border-radius: 14px; padding: 15px; }
 .card-title { font: 600 12px "Space Grotesk"; margin-bottom: 10px; }
 .result-card ul { padding-left: 17px; margin: 0; }
