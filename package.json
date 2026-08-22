@@ -1,0 +1,9 @@
+{
+  "name": "doclens",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PDF/image document extraction and smart summarization app designed for Vercel.",
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
