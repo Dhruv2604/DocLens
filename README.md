@@ -1,4 +1,4 @@
-Live URL: https://xdoclens.vercel.app
+Live: https://xdoclens.vercel.app
 
 # DocLens
 
