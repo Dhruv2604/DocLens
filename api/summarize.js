@@ -1,4 +1,4 @@
-const MODEL = "gemini-2.5-flash-lite";
+const MODEL = "gemini-3.5-flash-lite";
 
 const lengthInstructions = {
   short: "Write a tight 80–120 word executive summary.",
