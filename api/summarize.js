@@ -1,4 +1,4 @@
-const MODEL = "gemini-3.7-flash";
+const MODEL = "gemini-2.5-flash-lite";
 
 const lengthInstructions = {
   short: "Write a tight 80–120 word executive summary.",
@@ -73,24 +73,34 @@ DOCUMENT TEXT:
 ${text}
 `;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json"
-          }
-        })
+    const requestBody = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json"
       }
-    );
+    };
 
-    const payload = await response.json();
+    let response;
+    let payload;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey
+          },
+          body: JSON.stringify(requestBody)
+        }
+      );
+
+      payload = await response.json();
+
+      if (response.status !== 429 || attempt === 1) break;
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+    }
 
     if (!response.ok) {
       console.error("Gemini API error:", payload);
