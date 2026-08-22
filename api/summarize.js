@@ -84,7 +84,6 @@ ${text}
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.15,
             responseMimeType: "application/json"
           }
         })
@@ -95,8 +94,15 @@ ${text}
 
     if (!response.ok) {
       console.error("Gemini API error:", payload);
+      const googleMessage =
+        payload?.error?.message ||
+        payload?.error?.status ||
+        "Unknown Gemini API error.";
+
+      console.error("Gemini API error:", payload);
+
       return res.status(502).json({
-        error: "The AI summary service returned an error. Please verify your Gemini API key and try again."
+        error: `Gemini API error: ${googleMessage}`
       });
     }
 
