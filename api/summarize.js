@@ -1,9 +1,9 @@
 const MODEL = "gemini-3.7-flash";
 
 const lengthInstructions = {
-  short: "Keep the summary to about 100–150 words.",
-  medium: "Keep the summary to about 200–300 words.",
-  long: "Keep the summary to about 350–500 words."
+  short: "Write a tight 80–120 word executive summary.",
+  medium: "Write a clear 140–200 word executive summary.",
+  long: "Write a detailed 220–320 word executive summary."
 };
 
 export default async function handler(req, res) {
@@ -21,32 +21,53 @@ export default async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      // A deterministic fallback keeps the deployed app usable even before
-      // the optional Gemini API key is configured.
       return res.status(200).json(buildFallbackSummary(text, filename, length));
     }
 
     const prompt = `
-You are DocLens, a careful document analyst.
+You are DocLens, a professional document intelligence assistant.
 
-Analyze ONLY the document text supplied below. Do not invent facts, statistics,
-names, dates, or conclusions that are not supported by the text.
+Your job is to turn raw extracted document text into a genuinely useful executive
+summary. The input may be a resume, report, article, assignment, proposal, notes,
+research paper, policy, or business document.
 
-Return valid JSON with exactly these fields:
+IMPORTANT:
+- Do NOT simply repeat or lightly reformat the source text.
+- Do NOT copy contact details, URLs, email addresses, phone numbers, or long lists
+  unless they are essential to understanding the document.
+- Remove duplicated phrases caused by PDF extraction.
+- Do not invent facts.
+- Prioritize purpose, major themes, strongest findings, important requirements,
+  achievements, decisions, conclusions, or implications.
+- For a resume, summarize the candidate's profile, strongest skills, experience,
+  projects/achievements, and overall positioning — not their contact information.
+- For a report/article, summarize the problem, main findings, evidence, and conclusion.
+- Write like an executive brief: concise, natural, polished, and easy to scan.
+
+Return ONLY valid JSON:
 {
-  "title": "short descriptive title",
-  "summary": "coherent summary",
-  "keyPoints": ["3 to 6 concise points"],
-  "suggestions": ["3 to 5 practical improvement suggestions"]
+  "title": "3–7 word descriptive title",
+  "summary": "A polished executive summary in 2–4 short paragraphs.",
+  "keyPoints": [
+    "A meaningful takeaway",
+    "A second meaningful takeaway",
+    "A third meaningful takeaway",
+    "Optional fourth takeaway"
+  ],
+  "suggestions": [
+    "A practical improvement",
+    "A second practical improvement",
+    "A third practical improvement"
+  ]
 }
 
 ${lengthInstructions[length] || lengthInstructions.medium}
-The summary should capture the document's main purpose, important findings,
-decisions, requirements, or conclusions. Suggestions should focus on clarity,
-structure, missing context, evidence, or actionable improvements that are
-reasonable from the document itself.
 
-Document filename: ${filename}
+The "summary" must be a synthesis, not a transcript. Each key point should add
+information rather than repeating the summary. Suggestions should be specific to
+the document type and content.
+
+Filename: ${filename}
 
 DOCUMENT TEXT:
 ${text}
@@ -63,7 +84,7 @@ ${text}
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.2,
+            temperature: 0.15,
             responseMimeType: "application/json"
           }
         })
@@ -84,10 +105,6 @@ ${text}
       .join("")
       .trim();
 
-    if (!raw) {
-      return res.status(502).json({ error: "The AI service returned an empty response." });
-    }
-
     const parsed = safeJsonParse(raw);
 
     if (!parsed || typeof parsed !== "object") {
@@ -95,10 +112,10 @@ ${text}
     }
 
     return res.status(200).json({
-      title: parsed.title || filename,
-      summary: parsed.summary || "No summary was generated.",
-      keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints.slice(0, 6) : [],
-      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 5) : []
+      title: cleanTitle(parsed.title, filename),
+      summary: cleanSummary(parsed.summary),
+      keyPoints: cleanList(parsed.keyPoints, 5),
+      suggestions: cleanList(parsed.suggestions, 4)
     });
   } catch (error) {
     console.error(error);
@@ -110,54 +127,76 @@ function safeJsonParse(text) {
   try {
     return JSON.parse(text);
   } catch {
-    const match = text.match(/\{[\s\S]*\}/);
+    const match = String(text || "").match(/\{[\s\S]*\}/);
     if (!match) return null;
-    try {
-      return JSON.parse(match[0]);
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(match[0]); } catch { return null; }
   }
 }
 
+function cleanTitle(title, filename) {
+  const fallback = filename.replace(/\.[^/.]+$/, "") || "Document summary";
+  return String(title || fallback).replace(/\s+/g, " ").trim().slice(0, 70);
+}
+
+function cleanSummary(summary) {
+  return String(summary || "No summary was generated.")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function cleanList(list, max) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item) => String(item).replace(/\s+/g, " ").trim())
+    .filter((item) => item.length > 10)
+    .filter((item, index, arr) => arr.indexOf(item) === index)
+    .slice(0, max);
+}
+
 function buildFallbackSummary(text, filename, length) {
-  const sentences = text
+  const clean = text
     .replace(/\s+/g, " ")
+    .replace(/\b[\w.-]+@[\w.-]+\.\w+\b/g, "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .trim();
+
+  const sentences = clean
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 25);
+    .filter((s) => s.length > 35);
 
-  const target = length === "short" ? 3 : length === "long" ? 8 : 5;
-  const selected = selectRepresentativeSentences(sentences, target);
+  const count = length === "short" ? 3 : length === "long" ? 7 : 5;
+  const selected = selectRepresentativeSentences(sentences, count);
 
-  const pointSource = selected.length ? selected : sentences.slice(0, target);
-  const keyPoints = pointSource.slice(0, 6).map(trimSentence);
-
-  const suggestions = [
-    "Add a clear one-paragraph executive takeaway if the document is intended for quick review.",
-    "Use descriptive headings and short sections to make important information easier to scan.",
-    "Support important claims with sources, evidence, dates, or measurable outcomes where available."
-  ];
+  const keyPoints = selected.slice(0, 5).map(trimSentence);
 
   return {
     title: filename.replace(/\.[^/.]+$/, "") || "Document summary",
-    summary: selected.join(" ") || text.slice(0, 1200),
+    summary: selected.length
+      ? selected.join(" ")
+      : "The document contains text that could not be condensed reliably without an AI model.",
     keyPoints,
-    suggestions
+    suggestions: [
+      "Add a concise executive takeaway near the beginning for faster review.",
+      "Group related information under descriptive headings to improve scanability.",
+      "Support important claims with evidence, dates, metrics, or sources where appropriate."
+    ]
   };
 }
 
 function selectRepresentativeSentences(sentences, count) {
   if (sentences.length <= count) return sentences;
-  const step = (sentences.length - 1) / (count - 1);
   const result = [];
   for (let i = 0; i < count; i++) {
-    result.push(sentences[Math.round(i * step)]);
+    const index = Math.round((i * (sentences.length - 1)) / (count - 1));
+    result.push(sentences[index]);
   }
   return [...new Set(result)];
 }
 
 function trimSentence(sentence) {
   const clean = sentence.replace(/\s+/g, " ").trim();
-  return clean.length > 180 ? `${clean.slice(0, 177)}…` : clean;
+  return clean.length > 170 ? `${clean.slice(0, 167)}…` : clean;
 }
